@@ -10,7 +10,7 @@ namespace ArcheAge_DB_Parser
         static void Main(string[] args)
         {
             Parser.parse("main_db.bin", "db.json");
-            Console.WriteLine("Hello World!");
+            Console.WriteLine("Finished Parsing Data!");
         }
     }
 }

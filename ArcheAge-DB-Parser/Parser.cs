@@ -19,8 +19,11 @@ namespace ArcheAge_DB_Parser
         public int offset;
         public bool hasCount;
     }
-    class Parser
+    partial class Parser
     {
+        const int START_OF_ROW = 100;
+        const int END_OF_TABLE = 101;
+
         static List<Table> tables;
         static BinaryReader reader;
 
@@ -44,6 +47,21 @@ namespace ArcheAge_DB_Parser
             foreach (Table table in tables)
             {
                 int rowCount;
+                if (table.name == "wearable_slots" && table.columns.Count == 2)
+                {
+                    wearable_slots.parse();
+                    continue;
+                }
+                if (table.name == "allowed_name_chars")
+                {
+                    allowed_name_chars.parse();
+                    continue;
+                }
+                if (table.name == "item_configs")
+                {
+                    item_configs.parse();
+                    continue;
+                }
                 if (table.hasCount && readRow())
                     rowCount = reader.ReadInt32();
                 while (readRow())
@@ -57,7 +75,7 @@ namespace ArcheAge_DB_Parser
                             continue;
                         }
                         switch(column.type)
-                        {
+                        { 
                             case "int":
                                 int iData = readInt32();
                                 //Console.Write(iData);
@@ -99,12 +117,12 @@ namespace ArcheAge_DB_Parser
         }
         static bool readRow()
         {
-            byte data = reader.ReadByte();
+            int data = reader.ReadByte();
             switch (data)
             {
-                case 100:
+                case START_OF_ROW:
                     return true;
-                case 101:
+                case END_OF_TABLE:
                     return false;
                 default:
                     Console.WriteLine(String.Format("Parsing Error Occured on readRow() at offer [{0:x}].",
