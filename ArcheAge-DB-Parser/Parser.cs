@@ -18,6 +18,8 @@ namespace ArcheAge_DB_Parser
         public List<Column> columns;
         public int offset;
         public bool hasCount;
+        public bool ignore;
+        public string query;//optimization
     }
     partial class Parser
     {
@@ -28,6 +30,49 @@ namespace ArcheAge_DB_Parser
         static BinaryReader reader;
 
         static List<string> lookupTable = new List<string>();
+
+        static List<string> stringTest = new List<string>();
+        static List<int> idLog = new List<int>();
+
+        public static bool checkDupes(string tableName)
+        {
+            foreach(string name in stringTest)
+            {
+                if (name == tableName)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        public static void testStrings(string tableName, int id)
+        {
+            if (checkDupes(tableName))
+            {
+                Console.WriteLine(String.Format("Duplicate {0} ID: {1}",tableName,id));
+            }
+            stringTest.Add(tableName);
+        }
+
+        public static bool filterCustoms(Table table)
+        {
+            if (table.name == "wearable_slots" && table.columns.Count == 2)
+            {
+                wearable_slots.parse();
+                return true;
+            }
+            if (table.name == "allowed_name_chars")
+            {
+                allowed_name_chars.parse();
+                return true;
+            }
+            if (table.name == "item_configs")
+            {
+                item_configs.parse();
+                return true;
+            }
+            return false;
+        }
 
         public static void parse(string db_filename, string cfg_filename)
         {
@@ -43,30 +88,29 @@ namespace ArcheAge_DB_Parser
                 Console.WriteLine("Failed to open database or config files.");
                 Environment.Exit(0);
             }
-
+            int id = 0;
+            sqlite_db.openDB("export.db");
+            sqlite_db.beginTransaction();
             foreach (Table table in tables)
             {
                 int rowCount;
-                if (table.name == "wearable_slots" && table.columns.Count == 2)
-                {
-                    wearable_slots.parse();
+                if (filterCustoms(table))
                     continue;
-                }
-                if (table.name == "allowed_name_chars")
-                {
-                    allowed_name_chars.parse();
-                    continue;
-                }
-                if (table.name == "item_configs")
-                {
-                    item_configs.parse();
-                    continue;
-                }
                 if (table.hasCount && readRow())
                     rowCount = reader.ReadInt32();
+
+                if (!table.ignore)
+                {
+                    sqlite_db.createTable(table);
+                }
+
                 while (readRow())
                 {
                     int skips = 0;//Used for color optimization
+
+                    if (!table.ignore)
+                        sqlite_db.createQuery(table);
+
                     foreach (Column column in table.columns)
                     {
                         if (skips > 0)
@@ -74,35 +118,46 @@ namespace ArcheAge_DB_Parser
                             skips--;
                             continue;
                         }
-                        switch(column.type)
-                        { 
+                        switch (column.type)
+                        {
                             case "int":
                                 int iData = readInt32();
-                                //Console.Write(iData);
+                                sqlite_db.addToQuery(column.name, iData);
                                 break;
                             case "double":
                                 double dData = readDouble();
-                                //Console.Write(dData);
+                                sqlite_db.addToQuery(column.name, dData);
                                 break;
                             case "bool":
                                 bool bData = readBool();
-                                //Console.Write(readBool());
+                                sqlite_db.addToQuery(column.name, bData);
                                 break;
                             case "string":
                                 string sData = readString();
-                                //Console.Write(sData);
-                                break;
-                            case "color":
-                                int cData = readColor();
-                                skips = 2;
+                                sqlite_db.addToQuery(column.name, sData);
                                 break;
                             case "time":
-                                double tData = readDouble();
-                                //.Write(tData);
+                                DateTime tData = readTime();
+                                sqlite_db.addToQuery(column.name, tData);
                                 break;
                             case "blob":
                                 byte[] blob = readBlob();
-                                //Console.Write(blob);
+                                sqlite_db.addToQuery(column.name, blob, blob.Length);
+                                break;
+                            case "color":
+                                int data = reader.ReadInt32();
+                                if (data != -1)
+                                {
+                                    //Ghetto Fix for Color Logic
+                                    string newName = column.name.Substring(0,column.name.Length - 1);
+                                    int r = reader.ReadInt32();
+                                    sqlite_db.addToQuery(newName + "r", r);
+                                    int g = reader.ReadInt32();
+                                    sqlite_db.addToQuery(newName + "g", g);
+                                    int b = reader.ReadInt32();
+                                    sqlite_db.addToQuery(newName + "b", b);
+                                }
+                                skips = 2;
                                 break;
                             default:
                                 Console.Write("Unknown Data Type");
@@ -110,11 +165,22 @@ namespace ArcheAge_DB_Parser
                         }
                         //Console.Write(",");
                     }
+                    if (!table.ignore)
+                        sqlite_db.executeQuery();
                     //Console.WriteLine();
                 }
-                Console.WriteLine("Successfully Parsed " + table.name);
+                //Console.WriteLine("Successfully Parsed " + table.name);
+                if (!table.ignore)
+                {
+                    //sqlite_db.endTransaction();
+                    testStrings(table.name, id);
+                }
+                id++;
             }
+            sqlite_db.endTransaction();
+            sqlite_db.closeDB();
         }
+
         static bool readRow()
         {
             int data = reader.ReadByte();
@@ -206,23 +272,25 @@ namespace ArcheAge_DB_Parser
             else
             {
                 int r = reader.ReadInt32();
-                int g = reader.ReadInt32() >> 8;
-                int b = reader.ReadInt32() >> 16;
+                int g = reader.ReadInt32();
+                int b = reader.ReadInt32();
                 return r + g + b;
             }
         }
 
-        static double readTime()
+        static DateTime readTime()
         {
-            double data = reader.ReadDouble();
-            return data;
+            long data = reader.ReadInt64();
+            DateTime date = new DateTime(1970, 1, 1).AddSeconds(data);
+            return date;
         }
 
         static byte[] readBlob()
         {
             int size = reader.ReadInt32();
+            byte[] data = reader.ReadBytes(size);
 
-            return reader.ReadBytes(size);
+            return data;
         }
     }
 }

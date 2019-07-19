@@ -9,7 +9,9 @@ namespace ArcheAge_DB_Parser
     {
         static void Main(string[] args)
         {
-            Parser.parse("main_db.bin", "db.json");
+            //System.IO.File.Copy("template.db", "export.db", true);
+            Parser.parse("en_us.bin", "en_us.json");
+            //Parser.parse("main_db.bin", "main_db.json");
             Console.WriteLine("Finished Parsing Data!");
         }
     }
