@@ -83,7 +83,7 @@ namespace ArcheAge_DB_Parser
                 Console.WriteLine("Failed to open database or config files.");
                 Environment.Exit(0);
             }
-
+            lookupTable.Clear();
             sqlite_db.openDB("export.db");
             sqlite_db.beginTransaction();
             foreach (Table table in tables)
