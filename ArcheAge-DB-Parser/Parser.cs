@@ -15,10 +15,7 @@ namespace ArcheAge_DB_Parser
         public static List<Table> tables;
         static BinaryReader reader;
 
-        static List<string> lookupTable = new List<string>();
-
-        static List<string> stringTest = new List<string>();
-        static List<int> idLog = new List<int>();
+        static List<string> lookup_table = new List<string>();
 
         static int counter;
         public static void updateConsole(string db_filename)
@@ -74,7 +71,7 @@ namespace ArcheAge_DB_Parser
                 Console.WriteLine("Failed to open database or config files.");
                 Environment.Exit(0);
             }
-            lookupTable.Clear();
+            lookup_table.Clear();
             sqlite_db.openDB("export.db");
             sqlite_db.beginTransaction();
             foreach (Table table in tables)
@@ -223,12 +220,12 @@ namespace ArcheAge_DB_Parser
                 if (LTOffset == -1)
                 {
                     data = readCString();
-                    lookupTable.Add(data);
+                    lookup_table.Add(data);
                     return data;
                 }
                 else
                 {
-                    return lookupTable[LTOffset];
+                    return lookup_table[LTOffset];
                 }
             }
             else if (strType == 0x0)
