@@ -8,10 +8,10 @@ namespace ArcheAge_DB_Parser
     {
         class allowed_name_chars
         {
-            public static void parse()
+            public static void parse(Table table)
             {
-                int id = 0;
-
+                int id = 1;
+                sqlite_db.createTable(table);
                 readRow();
                 int count = readInt32();
                 int max = readInt32();
@@ -20,8 +20,15 @@ namespace ArcheAge_DB_Parser
 
                 while (readRow())
                 {
+                    sqlite_db.createQuery(table);
+
+                    sqlite_db.addToQuery("id", id);
                     string char_val = readString();
+                    sqlite_db.addToQuery("char", char_val);
                     int char_len = readInt32();
+                    sqlite_db.addToQuery("bytes", char_len);
+
+                    sqlite_db.executeQuery();
                     id++;
                 }
             }

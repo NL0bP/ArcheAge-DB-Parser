@@ -34,7 +34,7 @@ namespace ArcheAge_DB_Parser
 
         public static void createTable(Table table)
         {
-            string query = String.Format("CREATE TABLE {0} (", table.name);
+            string query = String.Format("CREATE TABLE IF NOT EXISTS  {0} (", table.name);
             foreach (Column column in table.columns)
             {
                 switch (column.type)
@@ -67,6 +67,8 @@ namespace ArcheAge_DB_Parser
                 }
             }
             query = query.TrimEnd(',') + ");";
+            SQLiteCommand sqlComm = new SQLiteCommand(query, con);
+            sqlComm.ExecuteNonQuery();
         }
 
         public static void createQuery(Table table)

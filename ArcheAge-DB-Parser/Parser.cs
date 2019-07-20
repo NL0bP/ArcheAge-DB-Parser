@@ -34,41 +34,36 @@ namespace ArcheAge_DB_Parser
         static List<string> stringTest = new List<string>();
         static List<int> idLog = new List<int>();
 
-        public static bool checkDupes(string tableName)
+        static int counter;
+        public static void updateConsole(string db_filename)
         {
-            foreach(string name in stringTest)
+            counter++;
+            if (counter > 5000)
             {
-                if (name == tableName)
-                {
-                    return true;
-                }
+                Console.Clear();
+                Console.WriteLine("Parsing [{0}] {1:P}", db_filename,
+                    (double)reader.BaseStream.Position / (double)reader.BaseStream.Length);
+                counter = 0;
             }
-            return false;
-        }
-        public static void testStrings(string tableName, int id)
-        {
-            if (checkDupes(tableName))
-            {
-                Console.WriteLine(String.Format("Duplicate {0} ID: {1}",tableName,id));
-            }
-            stringTest.Add(tableName);
+
+
         }
 
         public static bool filterCustoms(Table table)
         {
             if (table.name == "wearable_slots" && table.columns.Count == 2)
             {
-                wearable_slots.parse();
+                wearable_slots.parse(table);
                 return true;
             }
             if (table.name == "allowed_name_chars")
             {
-                allowed_name_chars.parse();
+                allowed_name_chars.parse(table);
                 return true;
             }
             if (table.name == "item_configs")
             {
-                item_configs.parse();
+                item_configs.parse(table);
                 return true;
             }
             return false;
@@ -88,7 +83,7 @@ namespace ArcheAge_DB_Parser
                 Console.WriteLine("Failed to open database or config files.");
                 Environment.Exit(0);
             }
-            int id = 0;
+
             sqlite_db.openDB("export.db");
             sqlite_db.beginTransaction();
             foreach (Table table in tables)
@@ -107,6 +102,8 @@ namespace ArcheAge_DB_Parser
                 while (readRow())
                 {
                     int skips = 0;//Used for color optimization
+
+                    updateConsole(db_filename);
 
                     if (!table.ignore)
                         sqlite_db.createQuery(table);
@@ -170,12 +167,6 @@ namespace ArcheAge_DB_Parser
                     //Console.WriteLine();
                 }
                 //Console.WriteLine("Successfully Parsed " + table.name);
-                if (!table.ignore)
-                {
-                    //sqlite_db.endTransaction();
-                    testStrings(table.name, id);
-                }
-                id++;
             }
             sqlite_db.endTransaction();
             sqlite_db.closeDB();
