@@ -7,26 +7,12 @@ using System.Diagnostics;
 
 namespace ArcheAge_DB_Parser
 {
-    class Column
-    {
-        public string name;
-        public string type;
-    }
-    class Table
-    {
-        public string name;
-        public List<Column> columns;
-        public int offset;
-        public bool hasCount;
-        public bool ignore;
-        public string query;//optimization
-    }
     partial class Parser
     {
         const int START_OF_ROW = 100;
         const int END_OF_TABLE = 101;
 
-        static List<Table> tables;
+        public static List<Table> tables;
         static BinaryReader reader;
 
         static List<string> lookupTable = new List<string>();
@@ -64,6 +50,11 @@ namespace ArcheAge_DB_Parser
             if (table.name == "item_configs")
             {
                 item_configs.parse(table);
+                return true;
+            }
+            if (table.name == "wearables")
+            {
+                wearables.parse(table);
                 return true;
             }
             return false;
@@ -166,7 +157,7 @@ namespace ArcheAge_DB_Parser
                         sqlite_db.executeQuery();
                     //Console.WriteLine();
                 }
-                //Console.WriteLine("Successfully Parsed " + table.name);
+                Console.WriteLine("Successfully Parsed " + table.name);
             }
             sqlite_db.endTransaction();
             sqlite_db.closeDB();

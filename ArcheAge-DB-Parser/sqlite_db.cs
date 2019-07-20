@@ -9,6 +9,9 @@ namespace ArcheAge_DB_Parser
     {
         static SQLiteConnection con;
         static SQLiteCommand cmd;
+
+        static List<string> foreign_key_queries = new List<string>();
+
         public static void openDB(string db_filename)
         {
             con = new SQLiteConnection(String.Format("URI=file:{0}", db_filename));
@@ -32,6 +35,25 @@ namespace ArcheAge_DB_Parser
             sqlComm.ExecuteNonQuery();
         }
 
+        static void checkForeignKey(string col_name, string tbl_name)
+        {
+            if (!col_name.EndsWith("_id"))
+                return;
+            string fName = col_name.Substring(0, col_name.IndexOf("_id"));
+            foreach (Table table in Parser.tables)
+            {
+                if (table.name == fName ||
+                      table.name.TrimEnd('s') == fName ||
+                      table.name == fName.TrimEnd('s'))
+                {
+                    foreign_key_queries.Add(
+                        String.Format(",FOREIGN KEY({0}) REFERENCES {1}(id)", col_name, table.name)
+                    );
+                    return;
+                }
+            }
+        }
+
         public static void createTable(Table table)
         {
             string query = String.Format("CREATE TABLE IF NOT EXISTS  {0} (", table.name);
@@ -42,6 +64,7 @@ namespace ArcheAge_DB_Parser
                     case "int":
                         query += String.Format("{0} int {1},", column.name, 
                             (column.name=="id")?"PRIMARY KEY":"");
+                        checkForeignKey(column.name, table.name);
                         break;
                     case "double":
                         query += String.Format("{0} real,", column.name);
@@ -66,7 +89,14 @@ namespace ArcheAge_DB_Parser
                         break;
                 }
             }
-            query = query.TrimEnd(',') + ");";
+            query = query.TrimEnd(',');
+            foreach(string fKey in foreign_key_queries)
+            {
+                query += fKey;
+            }
+            foreign_key_queries.Clear();
+
+            query += ");";
             SQLiteCommand sqlComm = new SQLiteCommand(query, con);
             sqlComm.ExecuteNonQuery();
         }
