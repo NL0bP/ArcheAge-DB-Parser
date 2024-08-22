@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace ArcheAge_DB_Parser
+﻿namespace ArcheAge_DB_Parser
 {
     partial class Parser
     {

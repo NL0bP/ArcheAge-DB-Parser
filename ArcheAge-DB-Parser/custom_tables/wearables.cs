@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace ArcheAge_DB_Parser
 {
@@ -26,12 +24,20 @@ namespace ArcheAge_DB_Parser
                 {
                     wearables_row new_row = new wearables_row();
                     if (first_call)
+                    {
                         rows.Add(new_row);
+                    }
+
                     int bp = reader.ReadInt32();
                     if (first_call)
+                    {
                         rows[count].armor_bp = bp;
+                    }
                     else
+                    {
                         rows[count].magic_bp = bp;
+                    }
+
                     int armor_type_id = reader.ReadInt32();
                     rows[count].armor_type_id = armor_type_id;
                     int slot_type_id = reader.ReadInt32();

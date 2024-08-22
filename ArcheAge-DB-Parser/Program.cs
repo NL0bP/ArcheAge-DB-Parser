@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using Newtonsoft.Json;
 
 namespace ArcheAge_DB_Parser
 {
@@ -10,9 +8,13 @@ namespace ArcheAge_DB_Parser
         static void Main(string[] args)
         {
             System.IO.File.Delete("export.db");
+            //System.IO.File.Delete("export.db-journal");
             //System.IO.File.Copy("template.db", "export.db", true);
-            Parser.parse("en_us.bin", "en_us.json");
-            Parser.parse("main_db.bin", "main_db.json");
+            Parser.parse("game2", "en_us.json");
+            //Parser.parse("game5", "ru.json");
+            //Parser.parse("game6", "de.json");
+            //Parser.parse("game7", "fr.json");
+            Parser.parse("game8", "main_db.json");
             Console.WriteLine("Finished Parsing Data!");
         }
     }

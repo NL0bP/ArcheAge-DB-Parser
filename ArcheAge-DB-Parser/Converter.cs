@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Newtonsoft.Json;
-using System.IO;
-using System.Diagnostics;
+﻿using System.Collections.Generic;
 using System.Data.SQLite;
+using System.IO;
 
 namespace ArcheAge_DB_Parser
 {
