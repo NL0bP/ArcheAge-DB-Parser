@@ -32,7 +32,7 @@ namespace ArcheAge_DB_Parser
             if (counter > 5000)
             {
                 Console.Clear();
-                using (var sw = new StreamWriter(writePath, true, Encoding.Default))
+                using (var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192))
                 {
                     sw.WriteLine("Parsing [{0}] {1:P}", db_filename, reader.BaseStream.Position / (double)reader.BaseStream.Length);
                 }
@@ -66,7 +66,7 @@ namespace ArcheAge_DB_Parser
             return false;
         }
 
-        public static void parse(string db_filename, string cfg_filename)
+        public static void parse(string db_filename, string cfg_filename, int offset = 0)
         {
             try
             {
@@ -75,15 +75,21 @@ namespace ArcheAge_DB_Parser
                 {
                     File.Delete(writePath);
                 }
-                
+
                 reader = new BinaryReader(File.Open(db_filename, FileMode.Open));
+                if (offset > 0)
+                {
+                    // Смещаем позицию чтения на offset байт
+                    //reader.BaseStream.Seek(offset, SeekOrigin.Begin);
+                    var sk = reader.ReadBytes(offset);
+                }
 
                 var jsonData = File.ReadAllText(cfg_filename);
-                tables = JsonConvert.DeserializeObject<List<Table>>(jsonData);
+                tables = JsonConvert.DeserializeObject<List<Table>>(jsonData); // здесь можно увидеть строку с ошибкой в .json
             }
             catch
             {
-                using (var sw = new StreamWriter(writePath, true, Encoding.Default))
+                using (var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192))
                 {
                     sw.WriteLine("Failed to open database or config files.");
                 }
@@ -94,20 +100,37 @@ namespace ArcheAge_DB_Parser
             sqlite_db.openDB("export.db");
             sqlite_db.beginTransaction();
             foreach (var table in tables)
-            {
-                int rowCount;
+            { 
+                int rowCount = -1;
                 var columnLangValues = new Dictionary<string, object>();
                 var nameLang = "en_us";
                 var indx = 1u;
 
                 if (filterCustoms(table))
                 {
+                    using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
+                    sw.WriteLine("filterCustoms: Table " + table.name);
+                    continue;
+                }
+
+                if (table.skipServerTable)
+                {
+                    using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
+                    sw.WriteLine("table.skipServerTable=true: Table " + table.name + ", let's skip the table");
                     continue;
                 }
 
                 if (table.hasCount && readRow())
                 {
                     rowCount = reader.ReadInt32();
+
+                    using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
+                    sw.WriteLine("table.hasCount=" + rowCount + ": Reading the number of records...");
+                }
+                else
+                {
+                    using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
+                    sw.WriteLine("table.hasCount=false: Skip reading the number of records...");
                 }
 
                 if (!table.ignore)
@@ -130,8 +153,8 @@ namespace ArcheAge_DB_Parser
                         sqlite_db.createTable(table);
                     }
 
-                    using var sw = new StreamWriter(writePath, true, Encoding.Default);
-                    sw.WriteLine("Table: {0}", table.name);
+                    using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
+                    sw.WriteLine("Table: {0}", table.name + " Let's try to parse the table...");
                     foreach (var clmn in table.columns)
                     {
                         sw.WriteLine("Field: {0}", clmn.name);
@@ -152,6 +175,12 @@ namespace ArcheAge_DB_Parser
                     }
                     foreach (var column in table.columns)
                     {
+                        if (table.ignore)
+                        {
+                            using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
+                            sw.WriteLine("table.ignore=true: Skip data recording...");
+                        }
+
                         if (skips > 0)
                         {
                             skips--;
@@ -159,18 +188,44 @@ namespace ArcheAge_DB_Parser
                         }
                         switch (column.type)
                         {
+                            case "real": // hardfix `map_icons` table
+                                var rData = readReal();
+                                if (!table.ignore)
+                                {
+                                    sqlite_db.addToQuery(column.name, rData);
+                                }
+                                break;
+                            case "int2": // hardfix `map_icons` table
+                                var iData2 = readInt2();
+                                if (!table.ignore)
+                                {
+                                    sqlite_db.addToQuery(column.name, iData2);
+                                }
+
+                                break;
                             case "int":
                                 var iData = readInt32();
+                                if (!table.ignore)
+                                {
+                                    sqlite_db.addToQuery(column.name, iData);
+                                }
 
-                                sqlite_db.addToQuery(column.name, iData);
                                 break;
                             case "double":
                                 var dData = readDouble();
-                                sqlite_db.addToQuery(column.name, dData);
+                                if (!table.ignore)
+                                {
+                                    sqlite_db.addToQuery(column.name, dData);
+                                }
+
                                 break;
                             case "bool":
                                 var bData = readBool();
-                                sqlite_db.addToQuery(column.name, bData);
+                                if (!table.ignore)
+                                {
+                                    sqlite_db.addToQuery(column.name, bData);
+                                }
+
                                 break;
                             case "string":
                                 var sData = readString();
@@ -178,90 +233,101 @@ namespace ArcheAge_DB_Parser
                                 //// расскоменируй это: for localize_text - в базу добавлен дополнительный столбец ID. Работает когда есть готовая база с другим языком, например английским и мы добавляем другой, например русский
                                 //if (localize.columns != null)
                                 //{
-                                //    // этот свитч для попытки добавить в локализацию 3.0.4.2 русский язык из версии 3.0.3.0
-                                //    switch (indx)
-                                //    {
-                                //        case 154713:
-                                //            indx = 154715;
-                                //            break;
-                                //        case 155265:
-                                //            indx = 155267;
-                                //            break;
-                                //        case 155318:
-                                //            indx = 155320;
-                                //            break;
-                                //        case 155321:
-                                //            indx = 155322;
-                                //            break;
-                                //        case 155337:
-                                //            indx = 155338;
-                                //            break;
-                                //        case 313986:
-                                //            skipped = 1; // сдвиг на 1 строку выше
-                                //            break;
-                                //        case 314029:
-                                //            skipped = 0; // отмена сдвига строк выше
-                                //            break;
-                                //        case 327022:
-                                //            skipped = 2; // сдвиг строк выше
-                                //            break;
-                                //        case 372629:
-                                //            skipped = 0; // отмена сдвига строк выше
-                                //            indx = 372631;
-                                //            break;
-                                //        case 404972:
-                                //            indx = 404974;
-                                //            break;
-                                //        case 406524:
-                                //            indx = 406527;
-                                //            break;
-                                //        case 406603:
-                                //            indx = 406604;
-                                //            break;
-                                //        case 430989:
-                                //            indx = 430991;
-                                //            break;
-                                //        case 431189:
-                                //            indx = 431192;
-                                //            break;
-                                //        case 443488:
-                                //            indx = 443490;
-                                //            break;
-                                //        case 447556:
-                                //            indx = 447558;
-                                //            break;
-                                //        case 477262:
-                                //            indx = 477265;
-                                //            break;
-                                //        case 482063:
-                                //            indx = 482067;
-                                //            break;
-                                //        //case 489435:
-                                //        //    skipped = 0; // отмена сдвига строк выше
-                                //        //    break;
-                                //        default:
-                                //            indx = indx;
-                                //            break;
-                                //    }
+                                //    //    // этот свитч для попытки добавить в локализацию 3.0.4.2 русский язык из версии 3.0.3.0
+                                //    //    switch (indx)
+                                //    //    {
+                                //    //        case 154713:
+                                //    //            indx = 154715;
+                                //    //            break;
+                                //    //        case 155265:
+                                //    //            indx = 155267;
+                                //    //            break;
+                                //    //        case 155318:
+                                //    //            indx = 155320;
+                                //    //            break;
+                                //    //        case 155321:
+                                //    //            indx = 155322;
+                                //    //            break;
+                                //    //        case 155337:
+                                //    //            indx = 155338;
+                                //    //            break;
+                                //    //        case 313986:
+                                //    //            skipped = 1; // сдвиг на 1 строку выше
+                                //    //            break;
+                                //    //        case 314029:
+                                //    //            skipped = 0; // отмена сдвига строк выше
+                                //    //            break;
+                                //    //        case 327022:
+                                //    //            skipped = 2; // сдвиг строк выше
+                                //    //            break;
+                                //    //        case 372629:
+                                //    //            skipped = 0; // отмена сдвига строк выше
+                                //    //            indx = 372631;
+                                //    //            break;
+                                //    //        case 404972:
+                                //    //            indx = 404974;
+                                //    //            break;
+                                //    //        case 406524:
+                                //    //            indx = 406527;
+                                //    //            break;
+                                //    //        case 406603:
+                                //    //            indx = 406604;
+                                //    //            break;
+                                //    //        case 430989:
+                                //    //            indx = 430991;
+                                //    //            break;
+                                //    //        case 431189:
+                                //    //            indx = 431192;
+                                //    //            break;
+                                //    //        case 443488:
+                                //    //            indx = 443490;
+                                //    //            break;
+                                //    //        case 447556:
+                                //    //            indx = 447558;
+                                //    //            break;
+                                //    //        case 477262:
+                                //    //            indx = 477265;
+                                //    //            break;
+                                //    //        case 482063:
+                                //    //            indx = 482067;
+                                //    //            break;
+                                //    //        //case 489435:
+                                //    //        //    skipped = 0; // отмена сдвига строк выше
+                                //    //        //    break;
+                                //    //        default:
+                                //    //            indx = indx;
+                                //    //            break;
+                                //    //    }
 
                                 //    columnLangValues = new Dictionary<string, object>
-                                //    {
-                                //        { column.name, sData }
-                                //    };
+                                //        {
+                                //            { column.name, sData }
+                                //        };
                                 //    sqlite_db.UpdateRowInTable(table, columnLangValues, $"id = {indx - skipped}");
                                 //}
                                 //else
                                 {
-                                    sqlite_db.addToQuery(column.name, sData);
+                                    if (!table.ignore)
+                                    {
+                                        sqlite_db.addToQuery(column.name, sData);
+                                    }
                                 }
                                 break;
                             case "time":
                                 var tData = readTime();
-                                sqlite_db.addToQuery(column.name, tData);
+                                if (!table.ignore)
+                                {
+                                    sqlite_db.addToQuery(column.name, tData);
+                                }
+
                                 break;
                             case "blob":
                                 var blob = readBlob();
-                                sqlite_db.addToQuery(column.name, blob, blob.Length);
+                                if (!table.ignore)
+                                {
+                                    sqlite_db.addToQuery(column.name, blob, blob.Length);
+                                }
+
                                 break;
                             case "color":
                                 var data = reader.ReadInt32();
@@ -270,16 +336,27 @@ namespace ArcheAge_DB_Parser
                                     //Ghetto Fix for Color Logic
                                     var newName = column.name.Substring(0, column.name.Length - 1);
                                     var r = reader.ReadInt32();
-                                    sqlite_db.addToQuery(newName + "r", r);
+                                    if (!table.ignore)
+                                    {
+                                        sqlite_db.addToQuery(newName + "r", r);
+                                    }
+
                                     var g = reader.ReadInt32();
-                                    sqlite_db.addToQuery(newName + "g", g);
+                                    if (!table.ignore)
+                                    {
+                                        sqlite_db.addToQuery(newName + "g", g);
+                                    }
+
                                     var b = reader.ReadInt32();
-                                    sqlite_db.addToQuery(newName + "b", b);
+                                    if (!table.ignore)
+                                    {
+                                        sqlite_db.addToQuery(newName + "b", b);
+                                    }
                                 }
                                 skips = 2;
                                 break;
                             default:
-                                using (var sw = new StreamWriter(writePath, true, Encoding.Default))
+                                using (var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192))
                                 {
                                     sw.WriteLine("Unknown Data Type");
                                 }
@@ -287,20 +364,29 @@ namespace ArcheAge_DB_Parser
                                 Console.Write("Unknown Data Type");
                                 break;
                         }
-                        // Console.Write(",");
                     }
                     if (!table.ignore)
                     {
                         sqlite_db.executeQuery();
                     }
                     indx++;
-                    // Console.WriteLine();
                 }
-                using (var sw = new StreamWriter(writePath, true, Encoding.Default))
+                using (var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192))
                 {
+                    if (table.hasCount && rowCount == 0)
+                    {
+                        sw.WriteLine("Has Empty table " + table.name);
+                    }
                     sw.WriteLine("Successfully Parsed " + table.name);
                 }
                 Console.WriteLine("Successfully Parsed " + table.name);
+
+                if (table.closeDb)
+                {
+                    using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
+                    sw.WriteLine("table.closeDb=true: Let's save the database and finish the job...");
+                    break;
+                }
             }
             sqlite_db.endTransaction();
             sqlite_db.closeDB();
@@ -316,7 +402,7 @@ namespace ArcheAge_DB_Parser
                 case END_OF_TABLE:
                     return false;
                 default:
-                    using (var sw = new StreamWriter(writePath, true, Encoding.Default))
+                    using (var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192))
                     {
                         sw.WriteLine("Parsing Error Occured on readRow() at offer [{0:x}].", reader.BaseStream.Position);
                     }
@@ -329,14 +415,14 @@ namespace ArcheAge_DB_Parser
 
         static string readCString()
         {
-            var data = "";
+            var data = new StringBuilder();
             char nextChar;
 
             while ((nextChar = reader.ReadChar()) != '\0')
             {
-                data += nextChar;
+                data.Append(nextChar);
             }
-            return data;
+            return data.ToString();
         }
 
         static int readInt32()
@@ -347,6 +433,10 @@ namespace ArcheAge_DB_Parser
         static double readDouble()
         {
             return reader.ReadDouble();
+        }
+        static float readReal()
+        {
+            return reader.ReadSingle();
         }
 
         static bool readBool()
@@ -375,7 +465,19 @@ namespace ArcheAge_DB_Parser
                 }
                 else
                 {
-                    return lookup_table[LTOffset];
+                    try
+                    {
+                        return lookup_table[LTOffset];
+                    }
+                    catch (Exception e)
+                    {
+                        using (var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192))
+                        {
+                            sw.WriteLine("Error Parsing String. Unrecognized Type({0}) at offset [{1:x}]", strType, reader.BaseStream.Position);
+                        }
+                        Console.WriteLine("Error Parsing String. Unrecognized Type({0}) at offset [{1:x}]", strType, reader.BaseStream.Position);
+                        throw;
+                    }
                 }
             }
             else if (strType == 0x0)
@@ -384,7 +486,7 @@ namespace ArcheAge_DB_Parser
             }
             else
             {
-                using (var sw = new StreamWriter(writePath, true, Encoding.Default))
+                using (var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192))
                 {
                     sw.WriteLine("Error Parsing String. Unrecognized Type({0}) at offset [{1:x}]", strType, reader.BaseStream.Position);
                 }
@@ -421,6 +523,20 @@ namespace ArcheAge_DB_Parser
         {
             var size = reader.ReadInt32();
             var data = reader.ReadBytes(size);
+
+            return data;
+        }
+        static int readInt2()
+        {
+            var data = reader.ReadInt32();
+            switch (data)
+            {
+                case 5:
+                    break;
+                case 1:
+                    data = reader.ReadInt32();
+                    break;
+            }
 
             return data;
         }

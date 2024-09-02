@@ -6,7 +6,7 @@
         {
             public static void parse(Table table)
             {
-                //Duplicate table query, do not add to database..
+                //Duplicate table query, do not add to database.
                 while (readRow())
                 {
                     int slot_type_id = reader.ReadInt32();
