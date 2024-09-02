@@ -15,7 +15,7 @@ namespace ArcheAge_DB_Parser
             //Parser.parse("game8", "unk8.json"); // This is Thai - th_th ?
             //Parser.parse("game4", "unk4.json"); // не добавляет, ошибка размера буфера для символа
             //Parser.parse("game0", "ko.json"); // This is correct; it is Korean.
-            //Parser.parse("game0", "zh_cn.json", 36); // "ko" in database is wrong, Chinese should be "zh_cn" // для дампа памяти в x32dbg 5070AAFree
+            //Parser.parse("game1", "zh_cn.json", 36); // "ko" in database is wrong, Chinese should be "zh_cn" // для дампа памяти в x32dbg 5070AAFree
             //Parser.parse("game2", "en_us.json");
             Parser.parse("game2", "en_us.json", 36); // для дампа памяти в x32dbg
             //Parser.parse("game4", "zh_cn.json");
