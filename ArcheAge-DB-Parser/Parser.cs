@@ -101,6 +101,12 @@ namespace ArcheAge_DB_Parser
             sqlite_db.beginTransaction();
             foreach (var table in tables)
             { 
+                if (table.ignore)
+                {
+                    using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
+                    sw.WriteLine("table.ignore=true: Skip data recording...");
+                }
+                
                 int rowCount = -1;
                 var columnLangValues = new Dictionary<string, object>();
                 var nameLang = "en_us";
@@ -109,14 +115,14 @@ namespace ArcheAge_DB_Parser
                 if (filterCustoms(table))
                 {
                     using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
-                    sw.WriteLine("filterCustoms: Table " + table.name);
+                    sw.WriteLine($"filterCustoms: Table {table.name}");
                     continue;
                 }
 
                 if (table.skipServerTable)
                 {
                     using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
-                    sw.WriteLine("table.skipServerTable=true: Table " + table.name + ", let's skip the table");
+                    sw.WriteLine($"table.skipServerTable=true: Table {table.name}, let's skip the table");
                     continue;
                 }
 
@@ -125,7 +131,7 @@ namespace ArcheAge_DB_Parser
                     rowCount = reader.ReadInt32();
 
                     using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
-                    sw.WriteLine("table.hasCount=" + rowCount + ": Reading the number of records...");
+                    sw.WriteLine($"table.hasCount={rowCount}: Reading the number of records...");
                 }
                 else
                 {
@@ -154,10 +160,10 @@ namespace ArcheAge_DB_Parser
                     }
 
                     using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
-                    sw.WriteLine("Table: {0}", table.name + " Let's try to parse the table...");
+                    sw.WriteLine($"Table: >{table.name}<");
                     foreach (var clmn in table.columns)
                     {
-                        sw.WriteLine("Field: {0}", clmn.name);
+                        sw.WriteLine($"Field: {clmn.name}");
                     }
                 }
 
@@ -175,12 +181,6 @@ namespace ArcheAge_DB_Parser
                     }
                     foreach (var column in table.columns)
                     {
-                        if (table.ignore)
-                        {
-                            using var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192);
-                            sw.WriteLine("table.ignore=true: Skip data recording...");
-                        }
-
                         if (skips > 0)
                         {
                             skips--;
@@ -375,11 +375,11 @@ namespace ArcheAge_DB_Parser
                 {
                     if (table.hasCount && rowCount == 0)
                     {
-                        sw.WriteLine("Has Empty table " + table.name);
+                        sw.WriteLine($"Has Empty table >{table.name}<");
                     }
-                    sw.WriteLine("Successfully Parsed " + table.name);
+                    sw.WriteLine($"Successfully Parsed >{table.name}<");
                 }
-                Console.WriteLine("Successfully Parsed " + table.name);
+                Console.WriteLine($"filterCustoms: Table {table.name}");
 
                 if (table.closeDb)
                 {
@@ -404,10 +404,10 @@ namespace ArcheAge_DB_Parser
                 default:
                     using (var sw = new StreamWriter(writePath, true, Encoding.Default, bufferSize: 8192))
                     {
-                        sw.WriteLine("Parsing Error Occured on readRow() at offer [{0:x}].", reader.BaseStream.Position);
+                        sw.WriteLine($"Parsing Error Occured on readRow() at offer [{reader.BaseStream.Position:x}].");
                     }
 
-                    Console.WriteLine("Parsing Error Occured on readRow() at offer [{0:x}].", reader.BaseStream.Position);
+                    Console.WriteLine($"Parsing Error Occured on readRow() at offer [{reader.BaseStream.Position:x}].");
                     Environment.Exit(0);
                     return false;
             }
