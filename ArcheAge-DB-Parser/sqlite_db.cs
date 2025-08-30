@@ -172,7 +172,7 @@ namespace ArcheAge_DB_Parser
         {
             var param = $"@{name}";
             cmd.Parameters.Add(param, System.Data.DbType.String);
-            cmd.Parameters[param].Value = value;
+            cmd.Parameters[param].Value = value ?? (object)DBNull.Value;
         }
 
         public static void addToQuery(string name, DateTime value)
@@ -196,6 +196,12 @@ namespace ArcheAge_DB_Parser
         {
             var param = $"@{name}";
             cmd.Parameters.Add(param, System.Data.DbType.Double);
+            cmd.Parameters[param].Value = value;
+        }
+        public static void addToQuery(string name, long value)
+        {
+            var param = $"@{name}";
+            cmd.Parameters.Add(param, System.Data.DbType.Int64);
             cmd.Parameters[param].Value = value;
         }
     }
